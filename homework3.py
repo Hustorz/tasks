@@ -131,9 +131,28 @@ class Book:
         return f"Title: {self.title}, Author: {self.author}, Pages: {self.pages}"
 
 
-b = Book("Мастер и Маргарита", "М. Булгаков", 480)
-print(b.str())
-b.pages = -10
+class Product:
+    def Product(self, name, price):
+        self.name = name
+        self.price = price 
+    def __str__(self):
+        return f"Product Name: {self.name}, Price: ${self.price:.2f}"
+    def __len__(self):
+        return len(self.name)
+    def __eq__(self, other):
+        if isinstance(other, Product):
+            return self.name == other.name and self.price == other.price
+        return False
+    def __add__(self, other):
+        if isinstance(other, Product):
+            return self.price + other.price
+        raise TypeError("Unsupported operand type for +: 'Product' and '{}'".format(type(other).__name__))
+    def __gt__(self, other):
+        if isinstance(other, Product):
+            return self.price > other.price
+        raise TypeError("Unsupported operand type for >: 'Product' and '{}'".format(type(other).__name__))
+
+
 
 
     
