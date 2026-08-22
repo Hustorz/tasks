@@ -1,79 +1,103 @@
 from abc import ABC, abstractmethod 
 
+class Notification_Creator(ABC):
+    @abstractmethod
+    def create_notification(self):
+        pass
+
+    def send(self, message):
+        notification = self.create_notification()
+        notification.send(message)
+
+class Email_Creator(Notification_Creator):
+    def create_notification(self):
+        return Email_Notification()
+
+
+class SMS_Creator(Notification_Creator):
+    def create_notification(self):
+        return SMS_Notification()
+
+
+class Push_Creator(Notification_Creator):
+    def create_notification(self):
+        return Push_Notification()
+
 class Notification(ABC):
+
     @abstractmethod
     def send(self, message):
         pass
 
-class EmailNotification(Notification):
-    def send(self, message):
+class Email_Notification(Notification):
+    def send(self, message: str):
         print(f"[EMAIL] {message}")
 
 
-class SMSNotification(Notification):
-    def send(self, message):
+class SMS_Notification(Notification):
+    def send(self, message: str):
         print(f"[SMS] {message}")
 
 
-class PushNotification(Notification):
-    def send(self, message):
+class Push_Notification(Notification):
+    def send(self, message: str):
         print(f"[PUSH] {message}")
 
-class NotificationFactory:
-    @staticmethod
-    def create_notification(notification_type):
-        if notification_type == "email":
-            return EmailNotification()
-        elif notification_type == "sms":
-            return SMSNotification()
-        elif notification_type == "push":
-            return PushNotification()
-        else:
-            raise ValueError(f"Unknown notification type: {notification_type}")
+def client_code(creator: Notification_Creator):
+    creator.send("Hello!")
+
+client_code(Email_Creator())
+client_code(SMS_Creator())
+client_code(Push_Creator())
 
 
-factory = NotificationFactory()
-factory.create_notification("email").send("Hello!")
-factory.create_notification("sms").send("Code: 1234")
-factory.create_notification("push").send("New message!")
+class Button(ABC):
+    @abstractmethod
+    def display(self):
+        pass
+
+class Input(ABC):
+    @abstractmethod
+    def display(self):
+        pass
 
 class UIFactory(ABC):
     @abstractmethod
-    def button(self):
+    def create_button(self):
         pass
     @abstractmethod
-    def input(self):
+    def create_input(self):
         pass
 
-class LightButton:
+class LightButton(Button):
     def display(self): 
         print("Light Button")
 
-class LightInput:
+class LightInput(Input):
     def display(self): 
         print("Light Input")
 
 class LightFactory(UIFactory):
-    def button(self): 
+    def create_button(self):
         return LightButton()
-    def input(self): 
+    def create_input(self):
         return LightInput()
 
-class DarkButton:
+class DarkButton(Button):
     def display(self): 
         print("Dark Button")
-class DarkInput:
+class DarkInput(Input):
     def display(self): 
         print("Dark Input")
 class DarkFactory(UIFactory):
-    def button(self): 
+    def create_button(self): 
         return DarkButton()
-    def input(self): 
+    def create_input(self): 
         return DarkInput()
 
 factory = LightFactory()
-factory.button().display()
-factory.input().display()
+factory.create_button().display()
+factory.create_input().display()
 
 
 class AudioProcessor:
