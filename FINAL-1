@@ -1,0 +1,537 @@
+from abc import ABC, abstractmethod
+class Repository(ABC):
+    @abstractmethod
+    def next_id(self) -> int:
+        pass
+    @abstractmethod
+    def add(self, item):
+        pass
+    @abstractmethod
+    def get(self, item_id):
+        pass
+    @abstractmethod
+    def remove(self, item_id):
+        pass
+    @abstractmethod
+    def exists(self, item_id) -> bool:
+        pass
+    @abstractmethod
+    def all(self) -> list:
+        pass
+
+
+class InMemoryRepository(Repository):
+    def __init__(self):
+        self._items = {}
+        self._last_id = 0
+    def next_id(self) -> int:
+        self._last_id += 1
+        return self._last_id
+    def add(self, item):
+        self._items[item.id] = item
+        return item
+    def get(self, item_id):
+        if item_id not in self._items:
+            raise ValueError(f"Object with id={item_id} not found")
+        return self._items[item_id]
+    def remove(self, item_id):
+        item = self.get(item_id)
+        del self._items[item_id]
+        return item
+
+    def exists(self, item_id) -> bool:
+        return item_id in self._items
+    def all(self) -> list:
+        return list(self._items.values())
+
+
+class Student:
+    def __init__(self, student_id: int, name: str, email: str, phone_number: str):
+        self.id = student_id
+        self.name = name
+        self.email = email
+        self.number = phone_number
+
+    def __repr__(self):
+        return f"Student({self.id}, {self.name}, {self.email}, {self.number})"
+
+
+class Teacher:
+    def __init__(self, teacher_id: int, name: str, subject: str, phone_number: str):
+        self.id = teacher_id
+        self.name = name
+        self.subject = subject
+        self.number = phone_number
+
+    def __repr__(self):
+        return f"Teacher({self.id}, {self.name}, {self.subject}, {self.number})"
+
+
+class Course(ABC):
+    def __init__(self, course_id: int, title: str, subject: str,
+                 capacity: int = 10, lessons: int = 5, passing_score: float = 60.0):
+        self.id = course_id
+        self.title = title
+        self.subject = subject
+        self.capacity = capacity
+        self.lessons = lessons
+        self.passing_score = passing_score
+        self.teacher_id = None
+
+    @abstractmethod
+    def info(self) -> str:
+        pass
+
+    def __repr__(self):
+        return f"Course({self.id}, {self.title})"
+
+
+class OnlineCourse(Course):
+    def __init__(self, course_id, title, subject, capacity=30, lessons=5,
+                 passing_score=60.0, platform="Zoom"):
+        super().__init__(course_id, title, subject, capacity, lessons, passing_score)
+        self.platform = platform
+
+    def info(self) -> str:
+        return f"{self.title} (online, {self.platform}, lessons: {self.lessons})"
+
+
+class OfflineCourse(Course):
+    def __init__(self, course_id, title, subject, capacity=12, lessons=5,
+                 passing_score=60.0, classroom="101"):
+        super().__init__(course_id, title, subject, capacity, lessons, passing_score)
+        self.classroom = classroom
+
+    def info(self) -> str:
+        return f"{self.title} (offline, room {self.classroom}, lessons: {self.lessons})"
+
+
+class Enrollment:
+    def __init__(self, enrollment_id: int, student_id: int, course_id: int):
+        self.id = enrollment_id
+        self.student_id = student_id
+        self.course_id = course_id
+        self.status = "active"
+        self.grades = []
+        self.attendance = {}
+        self.final_score = None
+    def __repr__(self):
+        return (f"Enrollment({self.id}, student={self.student_id}, "
+                f"course={self.course_id}, status={self.status})")
+
+
+class CourseCreator(ABC):
+    @abstractmethod
+    def create_course(self, course_id: int, title: str, subject: str, **kwargs) -> Course:
+        pass
+
+
+class OnlineCourseCreator(CourseCreator):
+    def create_course(self, course_id, title, subject, **kwargs) -> Course:
+        return OnlineCourse(
+            course_id, title, subject,
+            capacity=kwargs.get("capacity", 30),
+            lessons=kwargs.get("lessons", 5),
+            passing_score=kwargs.get("passing_score", 60.0),
+            platform=kwargs.get("platform", "Zoom"))
+
+
+class OfflineCourseCreator(CourseCreator):
+    def create_course(self, course_id, title, subject, **kwargs) -> Course:
+        return OfflineCourse(
+            course_id, title, subject,
+            capacity=kwargs.get("capacity", 12),
+            lessons=kwargs.get("lessons", 5),
+            passing_score=kwargs.get("passing_score", 60.0),
+            classroom=kwargs.get("classroom", "101"))
+
+
+class CourseFactory:
+
+    def __init__(self):
+        self._creators = {
+            "online": OnlineCourseCreator(),
+            "offline": OfflineCourseCreator(),
+        }
+
+    def register(self, name: str, creator: CourseCreator):
+        self._creators[name] = creator
+
+    def create(self, course_id, title, subject, kind="offline", **kwargs) -> Course:
+        if kind not in self._creators:
+            raise ValueError(f"Unknown course format: {kind}")
+        return self._creators[kind].create_course(course_id, title, subject, **kwargs)
+
+
+class GradingStrategy(ABC):
+    @abstractmethod
+    def calculate(self, grades: list, attendance: dict) -> float:
+        pass
+
+
+class AverageGradeStrategy(GradingStrategy):
+    def calculate(self, grades, attendance):
+        if not grades:
+            return 0.0
+        return sum(grades) / len(grades)
+
+
+class AttendancePenaltyStrategy(GradingStrategy):
+
+    def __init__(self, penalty_per_miss: float = 5.0):
+        self.penalty_per_miss = penalty_per_miss
+
+    def calculate(self, grades, attendance):
+        if not grades:
+            return 0.0
+        avg = sum(grades) / len(grades)
+        missed = sum(1 for visited in attendance.values() if not visited)
+        return max(0.0, avg - missed * self.penalty_per_miss)
+
+
+class Observer(ABC):
+    @abstractmethod
+    def update(self, subject):
+        pass
+
+
+class Subject(ABC):
+    @abstractmethod
+    def attach(self, observer: Observer):
+        pass
+
+    @abstractmethod
+    def detach(self, observer: Observer):
+        pass
+    @abstractmethod
+    def notify(self):
+        pass
+
+
+class EmailNotifier(Observer):
+    def update(self, subject):
+        print(f"[EMAIL] Report sent:\n{subject.last_report}\n")
+
+
+class CabinetNotifier(Observer):
+    def update(self, subject):
+        print(f"[CABINET] New report available:\n{subject.last_report}\n")
+
+
+class StudentService:
+    def __init__(self, repo: Repository):
+        self.repo = repo
+
+    def register(self, name: str, email: str, phone_number: str) -> Student:
+        if not name.strip():
+            raise ValueError("Student name cannot be empty")
+        if "@" not in email:
+            raise ValueError(f"Invalid email: {email}")
+        student = Student(self.repo.next_id(), name, email, phone_number)
+        return self.repo.add(student)
+
+    def get(self, student_id: int) -> Student:
+        return self.repo.get(student_id)
+
+    def all(self) -> list:
+        return self.repo.all()
+    def update_contacts(self, student_id: int, email: str = None,
+                        phone_number: str = None) -> Student:
+        student = self.repo.get(student_id)
+        if email is not None:
+            if "@" not in email:
+                raise ValueError(f"Invalid email: {email}")
+            student.email = email
+        if phone_number is not None:
+            student.number = phone_number
+        return student
+
+    def remove(self, student_id: int) -> Student:
+        return self.repo.remove(student_id)
+
+
+class TeacherService:
+    def __init__(self, repo: Repository):
+        self.repo = repo
+
+    def hire(self, name: str, subject: str, phone_number: str) -> Teacher:
+        if not name.strip():
+            raise ValueError("Teacher name cannot be empty")
+        teacher = Teacher(self.repo.next_id(), name, subject, phone_number)
+        return self.repo.add(teacher)
+
+    def get(self, teacher_id: int) -> Teacher:
+        return self.repo.get(teacher_id)
+
+    def all(self) -> list:
+        return self.repo.all()
+
+    def find_by_subject(self, subject: str) -> list:
+        return [t for t in self.repo.all() if t.subject.lower() == subject.lower()]
+
+    def dismiss(self, teacher_id: int) -> Teacher:
+        return self.repo.remove(teacher_id)
+
+
+class CourseService:
+    def __init__(self, repo: Repository, factory: CourseFactory, teacher_repo: Repository):
+        self.repo = repo
+        self.factory = factory
+        self.teacher_repo = teacher_repo
+
+    def create(self, title: str, subject: str, kind: str = "offline", **kwargs) -> Course:
+        if not title.strip():
+            raise ValueError("Course title cannot be empty")
+        course = self.factory.create(self.repo.next_id(), title, subject, kind, **kwargs)
+        return self.repo.add(course)
+
+    def get(self, course_id: int) -> Course:
+        return self.repo.get(course_id)
+
+    def all(self) -> list:
+        return self.repo.all()
+
+    def assign_teacher(self, course_id: int, teacher_id: int) -> Course:
+        course = self.repo.get(course_id)
+        if not self.teacher_repo.exists(teacher_id):
+            raise ValueError(f"Teacher with id={teacher_id} not found")
+        course.teacher_id = teacher_id
+        return course
+
+    def remove(self, course_id: int) -> Course:
+        return self.repo.remove(course_id)
+
+
+class EnrollmentService:
+    def __init__(self, repo: Repository, student_repo: Repository,
+                 course_repo: Repository, strategy: GradingStrategy):
+        self.repo = repo
+        self.student_repo = student_repo
+        self.course_repo = course_repo
+        self.strategy = strategy
+    def _active_count(self, course_id: int) -> int:
+        return sum(1 for e in self.repo.all()
+                   if e.course_id == course_id and e.status == "active")
+    def enroll(self, student_id: int, course_id: int) -> Enrollment:
+        if not self.student_repo.exists(student_id):
+            raise ValueError(f"Student with id={student_id} not found")
+        course = self.course_repo.get(course_id)
+
+        for e in self.repo.all():
+            if (e.student_id == student_id and e.course_id == course_id
+                    and e.status == "active"):
+                raise ValueError("Student is already enrolled in this course")
+
+        if self._active_count(course_id) >= course.capacity:
+            raise ValueError(f"Course '{course.title}' has no available seats")
+
+        enrollment = Enrollment(self.repo.next_id(), student_id, course_id)
+        return self.repo.add(enrollment)
+
+    def add_grade(self, enrollment_id: int, grade: float) -> Enrollment:
+        if not 0 <= grade <= 100:
+            raise ValueError("Grade must be in the range 0-100")
+        enrollment = self.repo.get(enrollment_id)
+        if enrollment.status != "active":
+            raise ValueError("Course is already finished, grades cannot be added")
+        enrollment.grades.append(grade)
+        return enrollment
+
+    def complete(self, enrollment_id: int) -> Enrollment:
+        enrollment = self.repo.get(enrollment_id)
+        if enrollment.status != "active":
+            raise ValueError("Enrollment is already closed")
+        if not enrollment.grades:
+            raise ValueError("Cannot complete a course without grades")
+
+        course = self.course_repo.get(enrollment.course_id)
+        score = self.strategy.calculate(enrollment.grades, enrollment.attendance)
+        enrollment.final_score = score
+        enrollment.status = "completed" if score >= course.passing_score else "failed"
+        return enrollment
+
+    def get(self, enrollment_id: int) -> Enrollment:
+        return self.repo.get(enrollment_id)
+
+    def by_course(self, course_id: int) -> list:
+        return [e for e in self.repo.all() if e.course_id == course_id]
+
+
+class AbstractAttendanceService(ABC):
+    @abstractmethod
+    def mark(self, enrollment_id: int, lesson_number: int, attended: bool):
+        pass
+
+
+class AttendanceService(AbstractAttendanceService):
+    def __init__(self, repo: Repository, course_repo: Repository):
+        self.repo = repo
+        self.course_repo = course_repo
+
+    def mark(self, enrollment_id: int, lesson_number: int, attended: bool) -> Enrollment:
+        enrollment = self.repo.get(enrollment_id)
+        course = self.course_repo.get(enrollment.course_id)
+        if not 1 <= lesson_number <= course.lessons:
+            raise ValueError(
+                f"Lesson {lesson_number} is out of range 1-{course.lessons}")
+        enrollment.attendance[lesson_number] = attended
+        return enrollment
+
+    def rate(self, enrollment_id: int) -> float:
+        enrollment = self.repo.get(enrollment_id)
+        if not enrollment.attendance:
+            return 0.0
+        visited = sum(1 for a in enrollment.attendance.values() if a)
+        return visited / len(enrollment.attendance) * 100
+
+
+class ReportService(Subject):
+    def __init__(self, strategy: GradingStrategy, repo: Repository,
+                 student_repo: Repository, course_repo: Repository):
+        self._observers = []
+        self.strategy = strategy
+        self.repo = repo
+        self.student_repo = student_repo
+        self.course_repo = course_repo
+        self.last_report = None
+
+    def attach(self, observer: Observer):
+        self._observers.append(observer)
+
+    def detach(self, observer: Observer):
+        self._observers.remove(observer)
+
+    def notify(self):
+        for obs in self._observers:
+            obs.update(self)
+    def generate_student_report(self, enrollment_id: int) -> str:
+        enrollment = self.repo.get(enrollment_id)
+        student = self.student_repo.get(enrollment.student_id)
+        course = self.course_repo.get(enrollment.course_id)
+
+        score = self.strategy.calculate(enrollment.grades, enrollment.attendance)
+        marked = len(enrollment.attendance)
+        visited = sum(1 for a in enrollment.attendance.values() if a)
+        rate = visited / marked * 100 if marked else 0.0
+        verdict = "passed" if score >= course.passing_score else "failed"
+
+        self.last_report = (
+            f"Student:      {student.name}\n"
+            f"Course:       {course.info()}\n"
+            f"Grades:       {enrollment.grades}\n"
+            f"Attendance:   {visited}/{marked} ({rate:.0f}%)\n"
+            f"Final score:  {score:.1f} with passing score {course.passing_score:.0f}\n"
+            f"Result:       {verdict}")
+        self.notify()
+        return self.last_report
+    def generate_course_report(self, course_id: int) -> str:
+        course = self.course_repo.get(course_id)
+        enrollments = [e for e in self.repo.all() if e.course_id == course_id]
+
+        lines = [f"Course report: {course.info()}",
+                 f"Enrolled students: {len(enrollments)}"]
+        scores = []
+        for e in enrollments:
+            student = self.student_repo.get(e.student_id)
+            score = self.strategy.calculate(e.grades, e.attendance)
+            scores.append(score)
+            lines.append(f"  {student.name}: {score:.1f} ({e.status})")
+        if scores:
+            lines.append(f"Average course score: {sum(scores) / len(scores):.1f}")
+
+        self.last_report = "\n".join(lines)
+        self.notify()
+        return self.last_report
+
+
+def build_services():
+    students_repo = InMemoryRepository()
+    teachers_repo = InMemoryRepository()
+    courses_repo = InMemoryRepository()
+    enrollments_repo = InMemoryRepository()
+
+    strategy = AttendancePenaltyStrategy()
+    factory = CourseFactory()
+
+    return {
+        "students": StudentService(students_repo),
+        "teachers": TeacherService(teachers_repo),
+        "courses": CourseService(courses_repo, factory, teachers_repo),
+        "enrollments": EnrollmentService(enrollments_repo, students_repo,
+                                         courses_repo, strategy),
+        "attendance": AttendanceService(enrollments_repo, courses_repo),
+        "reports": ReportService(strategy, enrollments_repo,
+                                 students_repo, courses_repo),
+    }
+
+
+if __name__ == "__main__":
+    s = build_services()
+    students, teachers = s["students"], s["teachers"]
+    courses, enrollments = s["courses"], s["enrollments"]
+    attendance, reports = s["attendance"], s["reports"]
+
+    reports.attach(EmailNotifier())
+    reports.attach(CabinetNotifier())
+
+    print("=== Teachers and courses ===")
+    ivanov = teachers.hire("Ivanov I.I.", "Mathematics", "+7 900 111-22-33")
+    petrova = teachers.hire("Petrova A.S.", "Programming", "+7 900 444-55-66")
+
+    math = courses.create("Algebra", "Mathematics", kind="offline",
+                          capacity=2, lessons=4, classroom="204")
+    python = courses.create("Python from Scratch", "Programming", kind="online",
+                            lessons=4, platform="Google Meet")
+
+    courses.assign_teacher(math.id, ivanov.id)
+    courses.assign_teacher(python.id, petrova.id)
+    for c in courses.all():
+        print(f"  {c.info()} — teacher: {teachers.get(c.teacher_id).name}")
+
+    print("\n=== Student enrollment ===")
+    alice = students.register("Alice", "alice@mail.com", "+7 900 000-00-01")
+    bob = students.register("Boris", "boris@mail.com", "+7 900 000-00-02")
+    clara = students.register("Clara", "clara@mail.com", "+7 900 000-00-03")
+
+    e_alice = enrollments.enroll(alice.id, math.id)
+    e_bob = enrollments.enroll(bob.id, math.id)
+    e_clara = enrollments.enroll(clara.id, python.id)
+    print(f"  {e_alice}\n  {e_bob}\n  {e_clara}")
+
+    print("\n=== Constraint checks ===")
+    for description, action in [
+        ("duplicate enrollment", lambda: enrollments.enroll(alice.id, math.id)),
+        ("capacity exceeded", lambda: enrollments.enroll(clara.id, math.id)),
+        ("lesson out of range", lambda: attendance.mark(e_alice.id, 99, True)),
+    ]:
+        try:
+            action()
+        except ValueError as err:
+            print(f"  {description}: {err}")
+
+    print("\n=== Attendance and grades ===")
+    for lesson, visited in [(1, True), (2, True), (3, True), (4, True)]:
+        attendance.mark(e_alice.id, lesson, visited)
+    for lesson, visited in [(1, True), (2, False), (3, False), (4, True)]:
+        attendance.mark(e_bob.id, lesson, visited)
+    for lesson, visited in [(1, True), (2, True), (3, False), (4, True)]:
+        attendance.mark(e_clara.id, lesson, visited)
+
+    for enrollment_id, grades in [(e_alice.id, [90, 85]),
+                                  (e_bob.id, [70, 65]),
+                                  (e_clara.id, [80, 75])]:
+        for grade in grades:
+            enrollments.add_grade(enrollment_id, grade)
+
+    print(f"  Alice's attendance: {attendance.rate(e_alice.id):.0f}%")
+    print(f"  Boris's attendance: {attendance.rate(e_bob.id):.0f}%")
+
+    print("\n=== Course completion ===")
+    for enrollment_id in (e_alice.id, e_bob.id, e_clara.id):
+        done = enrollments.complete(enrollment_id)
+        name = students.get(done.student_id).name
+        print(f"  {name}: {done.final_score:.1f} → {done.status}")
+
+    print("\n=== Reports ===")
+    reports.generate_student_report(e_bob.id)
+    reports.generate_course_report(math.id)
